@@ -119,7 +119,7 @@ exports.getSchoolPaymentInfo = async (req, res) => {
         const algoRate = parseInt(rate.toFixed(2))
         const schoolRate = parseInt(schoolPaymentInfo.paymentAmount)
         const totalAmount = Math.round(schoolRate / algoRate)
-        const charges = (1000 / algorate) * 1000000
+        // const charges = (1000 / algorate) * 1000000
 
         return res.json({
             paymentAmount: schoolPaymentInfo.paymentAmount,
