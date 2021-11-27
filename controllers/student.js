@@ -1,4 +1,5 @@
 require('dotenv').config()
+const util = require('util')
 const algosdk = require('algosdk')
 const axios = require('axios')
 const Student = require("../models/Student")
@@ -8,12 +9,14 @@ const Fee = require('../models/Fee')
 const upload = require("../lib/upload-config")
 const cloudinary = require('../lib/cloudinary')
 const algoClient = require('../config/algoclient')
-
+const enc = new util.TextEncoder();
 
 // validations
 const validateProfile = require('../validations/student-profile')
 const validatePassport = require('../validations/passport-upload')
 const validatePayment = require('../validations/payment')
+
+
 
 
 exports.create_updateProfile = async (req, res) => {
@@ -100,7 +103,7 @@ exports.getAlgoBalance = async (req, res) => {
         const studentProfile = await StudentProfile.findOne({ 'student': req.user.id })
         const { amount } = await algoClient.accountInformation(studentProfile.algoAddress).do()
         return res.json({
-            balance: amount/1000000
+            balance: amount / 1000000
         })
     } catch (error) {
         console.log(error)
@@ -109,46 +112,70 @@ exports.getAlgoBalance = async (req, res) => {
 }
 
 
+exports.getSchoolPaymentInfo = async (req, res) => {
+    try {
+        const schoolPaymentInfo = await Fee.findOne({ 'paymentType': 'School Fees' }).select('-_id -__v')
+        const { data: { rate } } = await axios.get("https://rest.coinapi.io/v1/exchangerate/USD/NGN", { headers: { 'X-CoinAPI-Key': process.env.COINAPI_KEY } })
+        const algoRate = parseInt(rate.toFixed(2))
+        const schoolRate = parseInt(schoolPaymentInfo.paymentAmount)
+        const totalAmount = Math.round(schoolRate / algoRate)
+        const charges = (1000 / algorate) * 1000000
+
+        return res.json({
+            paymentAmount: schoolPaymentInfo.paymentAmount,
+            paymentAddress: schoolPaymentInfo.paymentAddress,
+            paymentType: schoolPaymentInfo.paymentType,
+            algoAmount: totalAmount
+        })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ message: 'server error occured' })
+    }
+}
 exports.paySchoolCharges = async (req, res) => {
     try {
         const { errors, isValid } = validatePayment(req.body)
         const { paymentType, mnemonicKey } = req.body
 
         if (!isValid) return res.status(400).json(errors)
+
         const student = await Student.findById(req.user.id)
         const studentProfile = await StudentProfile.findOne({ 'student': req.user.id })
         const fee = await Fee.findOne({ 'paymentType': paymentType })
         const algoSecret = algosdk.mnemonicToSecretKey(mnemonicKey).sk
+        const accountInfo = await algoClient.accountInformation(student.algoAddress).do()
+
         const { data: { rate } } = await axios.get("https://rest.coinapi.io/v1/exchangerate/USD/NGN", { headers: { 'X-CoinAPI-Key': process.env.COINAPI_KEY } })
         const algoRate = parseInt(rate.toFixed(2))
         const schoolRate = parseInt(fee.paymentAmount)
-        const totalAmount = Math.round(schoolRate / algoRate)
+        const totalAmount = Math.round(schoolRate / algoRate) * (1000000)
         // console.log(totalAmount)
         // console.log(totalAmount * algoRate)
-        const accountInfo = await algoClient.accountInformation(student.algoAddress).do()
-
         if (accountInfo.amount < totalAmount) return res.status(400).json({ message: 'insufficient balance' })
-
-        // const mn = "shoulder bid nice taxi oven twice wheel exercise ramp hotel together drama gauge parent option powder anchor unlock cement frost toilet identify limb ability divide"
-        // const sk = algosdk.mnemonicToSecretKey(mn)
 
         const params = await algoClient.getTransactionParams().do()
         const signedTXN = algosdk.signTransaction({
             from: student.algoAddress,
             to: fee.paymentAddress,
             fee: 100,
-            amount: 1000000,
+            amount: totalAmount,
             firstRound: params.firstRound,
             lastRound: params.lastRound,
             genesisID: params.genesisID,
             genesisHash: params.genesisHash,
-            note: new Uint8Array(0)
+            note: enc.encode(`School Dues paid by ${studentProfile.matriculationNumber} to ${fee.paymentAddress}`)
         }, algoSecret)
+
         const sentTRX = await algoClient.sendRawTransaction(signedTXN.blob).do()
+
         if (sentTRX) {
             const paymentFields = {
                 student: req.user.id,
                 paymentId: sentTRX.txId,
+                paidTo: fee.paymentAddress,
+                studentAlgoId: student.algoAddress,
+                matriculationNumber: studentProfile.matriculationNumber,
+                fullName: studentProfile.fullName,
                 amount: totalAmount,
                 paymentCurrency: 'ALGO',
                 paymentType,
@@ -167,6 +194,25 @@ exports.paySchoolCharges = async (req, res) => {
 }
 
 
+exports.getFacultyPaymentInfo = async (req, res) => {
+    try {
+        const facultyPaymentInfo = await Fee.findOne({ 'paymentType': 'Faculty Fees' }).select('-_id -__v')
+        const { data: { rate } } = await axios.get("https://rest.coinapi.io/v1/exchangerate/USD/NGN", { headers: { 'X-CoinAPI-Key': process.env.COINAPI_KEY } })
+        const algoRate = parseInt(rate.toFixed(2))
+        const schoolRate = parseInt(facultyPaymentInfo.paymentAmount)
+        const totalAmount = Math.round(schoolRate / algoRate)
+
+        return res.json({
+            paymentAmount: facultyPaymentInfo.paymentAmount,
+            paymentAddress: facultyPaymentInfo.paymentAddress,
+            paymentType: facultyPaymentInfo.paymentType,
+            algoAmount: totalAmount
+        })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ message: 'server error occured' })
+    }
+}
 exports.payFacultyCharges = async (req, res) => {
     try {
         const { errors, isValid } = validatePayment(req.body)
@@ -177,18 +223,16 @@ exports.payFacultyCharges = async (req, res) => {
         const studentProfile = await StudentProfile.findOne({ 'student': req.user.id })
         const fee = await Fee.findOne({ 'paymentType': paymentType })
         const algoSecret = algosdk.mnemonicToSecretKey(mnemonicKey).sk
+
         const { data: { rate } } = await axios.get("https://rest.coinapi.io/v1/exchangerate/USD/NGN", { headers: { 'X-CoinAPI-Key': process.env.COINAPI_KEY } })
         const algoRate = parseInt(rate.toFixed(2))
-        const schoolRate = parseInt(fee.paymentAmount)
-        const totalAmount = Math.round(schoolRate / algoRate)
+        const facultyRate = parseInt(fee.paymentAmount)
+        const totalAmount = Math.round(facultyRate / algoRate) * (1000000)
         // console.log(totalAmount)
         // console.log(totalAmount * algoRate)
         const accountInfo = await algoClient.accountInformation(student.algoAddress).do()
 
         if (accountInfo.amount < totalAmount) return res.status(400).json({ message: 'insufficient balance' })
-
-        // const mn = "shoulder bid nice taxi oven twice wheel exercise ramp hotel together drama gauge parent option powder anchor unlock cement frost toilet identify limb ability divide"
-        // const sk = algosdk.mnemonicToSecretKey(mn)
 
         const params = await algoClient.getTransactionParams().do()
         const signedTXN = algosdk.signTransaction({
@@ -200,13 +244,19 @@ exports.payFacultyCharges = async (req, res) => {
             lastRound: params.lastRound,
             genesisID: params.genesisID,
             genesisHash: params.genesisHash,
-            note: new Uint8Array(0)
+            note: enc.encode(`Faculty Dues paid by ${studentProfile.matriculationNumber} to ${fee.paymentAddress}`)
         }, algoSecret)
+        
         const sentTRX = await algoClient.sendRawTransaction(signedTXN.blob).do()
+
         if (sentTRX) {
             const paymentFields = {
                 student: req.user.id,
                 paymentId: sentTRX.txId,
+                paidTo: fee.paymentAddress,
+                studentAlgoId: student.algoAddress,
+                matriculationNumber: studentProfile.matriculationNumber,
+                fullName: studentProfile.fullName,
                 amount: totalAmount,
                 paymentCurrency: 'ALGO',
                 paymentType,
@@ -225,6 +275,25 @@ exports.payFacultyCharges = async (req, res) => {
 }
 
 
+exports.getDepartmentPaymentInfo = async (req, res) => {
+    try {
+        const departmentPaymentInfo = await Fee.findOne({ 'paymentType': 'Department Fees' }).select('-_id -__v')
+        const { data: { rate } } = await axios.get("https://rest.coinapi.io/v1/exchangerate/USD/NGN", { headers: { 'X-CoinAPI-Key': process.env.COINAPI_KEY } })
+        const algoRate = parseInt(rate.toFixed(2))
+        const schoolRate = parseInt(departmentPaymentInfo.paymentAmount)
+        const totalAmount = Math.round(schoolRate / algoRate)
+
+        return res.json({
+            paymentAmount: departmentPaymentInfo.paymentAmount,
+            paymentAddress: departmentPaymentInfo.paymentAddress,
+            paymentType: departmentPaymentInfo.paymentType,
+            algoAmount: totalAmount
+        })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ message: 'server error occured' })
+    }
+}
 exports.payDepartmentCharges = async (req, res) => {
     try {
         const { errors, isValid } = validatePayment(req.body)
@@ -235,18 +304,17 @@ exports.payDepartmentCharges = async (req, res) => {
         const studentProfile = await StudentProfile.findOne({ 'student': req.user.id })
         const fee = await Fee.findOne({ 'paymentType': paymentType })
         const algoSecret = algosdk.mnemonicToSecretKey(mnemonicKey).sk
+
         const { data: { rate } } = await axios.get("https://rest.coinapi.io/v1/exchangerate/USD/NGN", { headers: { 'X-CoinAPI-Key': process.env.COINAPI_KEY } })
         const algoRate = parseInt(rate.toFixed(2))
-        const schoolRate = parseInt(fee.paymentAmount)
-        const totalAmount = Math.round(schoolRate / algoRate)
+        const departmentRate = parseInt(fee.paymentAmount)
+        const totalAmount = Math.round(departmentRate / algoRate) * (1000000)
         // console.log(totalAmount)
         // console.log(totalAmount * algoRate)
         const accountInfo = await algoClient.accountInformation(student.algoAddress).do()
 
         if (accountInfo.amount < totalAmount) return res.status(400).json({ message: 'insufficient balance' })
 
-        // const mn = "shoulder bid nice taxi oven twice wheel exercise ramp hotel together drama gauge parent option powder anchor unlock cement frost toilet identify limb ability divide"
-        // const sk = algosdk.mnemonicToSecretKey(mn)
 
         const params = await algoClient.getTransactionParams().do()
         const signedTXN = algosdk.signTransaction({
@@ -258,13 +326,17 @@ exports.payDepartmentCharges = async (req, res) => {
             lastRound: params.lastRound,
             genesisID: params.genesisID,
             genesisHash: params.genesisHash,
-            note: new Uint8Array(0)
+            note: enc.encode(`Faculty Dues paid by ${studentProfile.matriculationNumber} to ${fee.paymentAddress}`)
         }, algoSecret)
         const sentTRX = await algoClient.sendRawTransaction(signedTXN.blob).do()
         if (sentTRX) {
             const paymentFields = {
                 student: req.user.id,
                 paymentId: sentTRX.txId,
+                paidTo: fee.paymentAddress,
+                studentAlgoId: student.algoAddress,
+                matriculationNumber: studentProfile.matriculationNumber,
+                fullName: studentProfile.fullName,
                 amount: totalAmount,
                 paymentCurrency: 'ALGO',
                 paymentType,

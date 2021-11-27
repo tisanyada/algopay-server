@@ -12,6 +12,22 @@ const PaymentSchema = new Schema({
         type: String,
         required: true
     },
+    paidTo: {
+        type: String,
+        required: true
+    },
+    studentAlgoId: {
+        type: String,
+        required: true
+    },
+    matriculationNumber: {
+        type: String,
+        required: true
+    },
+    fullName: {
+        type: String,
+        required: true
+    },
     amount: {
         type: Number,
         required: true
@@ -31,6 +47,11 @@ const PaymentSchema = new Schema({
     paymentDepartment: {
         type: String,
         required: true
+    },
+    verified: {
+        type: Boolean,
+        required: true,
+        default: false
     }
 }, {
     timestamps: true

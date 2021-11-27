@@ -1,4 +1,5 @@
 const Fee = require('../models/Fee')
+const Payment = require('../models/Payment')
 
 
 const validateFeeSetup = require('../validations/fee-setup')
@@ -26,3 +27,72 @@ exports.setCharges = async (req, res) => {
         res.status(500).json({ message: 'server error occured' })
     }
 }
+
+
+exports.getUnverifiedSchoolReceipts = async (req, res) => {
+    try {
+        const { facultyId } = req.params
+        const receipts = await Payment.find({ 'paymentFaculty': facultyId, 'paymentType': 'School Fees' })
+            .select('-createdAt -updatedAt -__v')
+
+        if (receipts) {
+            const unverfied = receipts.filter(r => r.verified === false)
+            return res.json(unverfied)
+        }
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ message: 'server error occured' })
+    }
+}
+
+
+exports.getVerifiedSchoolReceipts = async (req, res) => {
+    try {
+        const { facultyId } = req.params
+        const receipts = await Payment.find({ 'paymentFaculty': facultyId, 'paymentType': 'School Fees' })
+            .select('-createdAt -updatedAt -__v')
+
+        if (receipts) {
+            const verfied = receipts.filter(r => r.verified === true)
+            return res.json(verfied)
+        }
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ message: 'server error occured' })
+    }
+}
+
+
+exports.getUnverifiedFacultyReceipts = async (req, res) => {
+    try {
+        const { facultyId } = req.params
+        const receipts = await Payment.find({ 'paymentFaculty': facultyId, 'paymentType': 'Faculty Fees' })
+            .select('-createdAt -updatedAt -__v')
+
+        if (receipts) {
+            const unverfied = receipts.filter(r => r.verified === false)
+            return res.json(unverfied)
+        }
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ message: 'server error occured' })
+    }
+}
+
+
+exports.getVerifiedFacultyReceipts = async (req, res) => {
+    try {
+        const { facultyId } = req.params
+        const receipts = await Payment.find({ 'paymentFaculty': facultyId, 'paymentType': 'Faculty Fees' })
+            .select('-createdAt -updatedAt -__v')
+
+        if (receipts) {
+            const verfied = receipts.filter(r => r.verified === true)
+            return res.json(verfied)
+        }
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ message: 'server error occured' })
+    }
+}
+

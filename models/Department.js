@@ -8,10 +8,6 @@ const DepartmentSchema = new Schema({
         type: String,
         required: true
     },
-    facultyName: {
-        type: String,
-        required: true
-    },
     departmentID: {
         type: String,
         required: true

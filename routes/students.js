@@ -1,6 +1,6 @@
 const router = require('express').Router()
 const { signup, signin } = require('../controllers/auth-student')
-const { create_updateProfile, addProfileImage, getProfile, paySchoolCharges, payFacultyCharges, payDepartmentCharges, getSchoolChargesReceipt, getFacultyChargesReceipt, getDepartmentChargesReceipt, getAlgoBalance } = require('../controllers/student')
+const { create_updateProfile, addProfileImage, getProfile, paySchoolCharges, payFacultyCharges, payDepartmentCharges, getSchoolChargesReceipt, getFacultyChargesReceipt, getDepartmentChargesReceipt, getAlgoBalance, getSchoolPaymentInfo, getFacultyPaymentInfo, getDepartmentPaymentInfo } = require('../controllers/student')
 const { protectStudentRoute } = require('../lib/token-config')
 
 
@@ -24,12 +24,15 @@ router.route('/get-profile').get(protectStudentRoute, getProfile)
 router.route('/get-algobalance').get(protectStudentRoute, getAlgoBalance)
 
 // make payment school
+router.route('/payments/school-info').get(protectStudentRoute, getSchoolPaymentInfo)
 router.route('/payments/school').post(protectStudentRoute, paySchoolCharges)
 
 // make payment faculty
+router.route('/payments/faculty-info').get(protectStudentRoute, getFacultyPaymentInfo)
 router.route('/payments/faculty').post(protectStudentRoute, payFacultyCharges)
 
 // make payment department
+router.route('/payments/department-info').get(protectStudentRoute, getDepartmentPaymentInfo)
 router.route('/payments/department').post(protectStudentRoute, payDepartmentCharges)
 
 
