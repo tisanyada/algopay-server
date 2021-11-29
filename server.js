@@ -10,8 +10,13 @@ const connect = require('./config/connect')
 
 
 // middlewares
+app.options("*", cors({
+    origin: ['https://algopay.vercel.app', 'https://focused-engelbart-f06e9e.netlify.app', 'http://localhost:3000'],
+    optionsSuccessStatus: 200
+}));
 app.use(cors({
-    origin: ['https://algopay.vercel.app', 'https://focused-engelbart-f06e9e.netlify.app', 'http://localhost:3000']
+    origin: ['https://algopay.vercel.app', 'https://focused-engelbart-f06e9e.netlify.app', 'http://localhost:3000'],
+    optionsSuccessStatus: 200
 }))
 app.use(helmet())
 app.use(morgan('dev'))
