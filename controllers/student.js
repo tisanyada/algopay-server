@@ -25,6 +25,7 @@ exports.create_updateProfile = async (req, res) => {
         const { fullName, schoolMail, algoAddress, matriculationNumber, faculty, department, level, phoneNumber } = req.body
 
         if (!isValid) return res.status(400).json(errors)
+        console.log(req.user)
         const profileFields = {
             student: req.user._id,
             fullName,
